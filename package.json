@@ -1,0 +1,32 @@
+{
+  "name": "wpsite-cli",
+  "version": "1.0.0",
+  "description": "WordPress development CLI powered by Docker",
+  "bin": {
+    "wpsite": "./bin/wpsite.js"
+  },
+  "main": "bin/wpsite.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "dependencies": {
+    "commander": "^11.0.0",
+    "chalk": "^4.1.2",
+    "ora": "^5.4.1"
+  },
+  "engines": {
+    "node": ">=14.0.0"
+  },
+  "keywords": [
+    "wordpress",
+    "cli",
+    "development",
+    "docker"
+  ],
+  "author": "Tu Nombre",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/tu-usuario/wpsite-cli.git"
+  }
+}
