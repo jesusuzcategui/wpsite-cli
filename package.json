@@ -23,10 +23,10 @@
     "development",
     "docker"
   ],
-  "author": "Tu Nombre",
+  "author": "Jesus Uzcategui",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/tu-usuario/wpsite-cli.git"
+    "url": "https://github.com/jesusuzcategui/wpsite-cli.git"
   }
 }
