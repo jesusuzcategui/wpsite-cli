@@ -1,6 +1,6 @@
 {
   "name": "wpsite-cli",
-  "version": "1.0.0",
+  "version": "1.2.0",
   "description": "WordPress development CLI powered by Docker",
   "bin": {
     "wpsite": "./bin/wpsite.js"
@@ -10,8 +10,10 @@
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "dependencies": {
-    "commander": "^11.0.0",
+    "adm-zip": "^0.5.10",
     "chalk": "^4.1.2",
+    "chokidar": "^4.0.3",
+    "commander": "^11.0.0",
     "ora": "^5.4.1"
   },
   "engines": {

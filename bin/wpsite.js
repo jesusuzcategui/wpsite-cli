@@ -24,6 +24,7 @@ program
   .command('dev')
   .description('Start local WordPress development server')
   .option('-p, --port <number>', 'Port number', '8080')
+  .option('-t, --tunel', 'Start ngrok tunnel for public access')
   .action((options) => {
     devCommand(options);
   });
