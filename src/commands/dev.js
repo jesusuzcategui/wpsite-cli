@@ -79,11 +79,25 @@ module.exports = async (options = {}) => {
       console.log(chalk.yellow('💡 Comparte esta URL con otros desarrolladores'));
     }
 
-    // 10. Cleanup al cerrar
+    // 10. Cleanup al cerrar (MODIFICAR ESTA PARTE)
     process.on('SIGINT', async () => {
-      console.log(chalk.red('\n🛑 Deteniendo contenedor...'));
+      console.log(chalk.red('\n🛑 Deteniendo servicios...'));
+
+      // Cerrar watchers si existen
+      if (global.wpContentWatchers) {
+        global.wpContentWatchers.localWatcher.close();
+        global.wpContentWatchers.containerWatcher.close();
+        console.log(chalk.yellow('📂 Watchers de archivos cerrados'));
+      }
+
+      // Detener túnel primero
+      if (ngrokTunnel && ngrokTunnel.process) {
+        await stopNgrokTunnel(ngrokTunnel.process);
+      }
+
+      // Luego detener contenedor
       await stopDockerContainer(containerId);
-      console.log(chalk.green('✅ Contenedor detenido correctamente'));
+      console.log(chalk.green('✅ Servicios detenidos correctamente'));
       process.exit(0);
     });
 
@@ -252,7 +266,7 @@ async function downloadWordPressWithNodeJS() {
   });
 }
 
-// Crear configuración de WordPress con soporte para URLs múltiples
+// Crear configuración de WordPress con URLs fijas para evitar problemas de sesión
 async function createWordPressConfig(port, ngrokUrl = null) {
   const configPath = path.join(process.cwd(), 'wpsite.config.js');
 
@@ -263,10 +277,12 @@ async function createWordPressConfig(port, ngrokUrl = null) {
   delete require.cache[require.resolve(configPath)];
   const config = require(configPath);
 
+  // Determinar URL principal
+  const primaryUrl = ngrokUrl || `http://localhost:${port}`;
+
   const wpConfig = `<?php
 /**
- * WordPress Configuration - Desarrollo con Docker
- * Soporte para URLs múltiples (localhost + ngrok)
+ * WordPress Configuration - URLs fijas para evitar problemas de sesión
  */
 
 // === CONFIGURACIÓN DE BASE DE DATOS ===
@@ -277,34 +293,42 @@ define('DB_HOST', '${config.database.host}');
 define('DB_CHARSET', 'utf8mb4');
 define('DB_COLLATE', '');
 
-// === URLs DINÁMICAS - DETECCIÓN AUTOMÁTICA ===
-${ngrokUrl ? `
-// URLs dinámicas - funciona con localhost Y ngrok
-if (isset($_SERVER['HTTP_HOST'])) {
-    $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') || $_SERVER['SERVER_PORT'] == 443 ? 'https' : 'http';
-    $host = $_SERVER['HTTP_HOST'];
-    $base_url = $protocol . '://' . $host;
-    
-    define('WP_HOME', $base_url);
-    define('WP_SITEURL', $base_url);
-} else {
-    // Fallback
-    define('WP_HOME', 'http://localhost:${port}');
-    define('WP_SITEURL', 'http://localhost:${port}');
-}
+// === URLs FIJAS ===
+define('WP_HOME', '${primaryUrl}');
+define('WP_SITEURL', '${primaryUrl}');
 
-// Headers para túneles
+// === CONFIGURACIÓN PARA TÚNELES ===
+${ngrokUrl ? `
+// Headers para ngrok
 if (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https') {
     $_SERVER['HTTPS'] = 'on';
 }
-if (isset($_SERVER['HTTP_X_FORWARDED_HOST'])) {
-    $_SERVER['HTTP_HOST'] = $_SERVER['HTTP_X_FORWARDED_HOST'];
-}
+
+// Forzar cookies para ngrok
+define('COOKIE_DOMAIN', '');
+define('COOKIEPATH', '/');
+define('SITECOOKIEPATH', '/');
+define('ADMIN_COOKIE_PATH', '/');
+define('PLUGINS_COOKIE_PATH', '/');
+
+// Configuración de sesión para ngrok
+ini_set('session.cookie_secure', false);
+ini_set('session.cookie_samesite', 'Lax');
 ` : `
-// Configuración solo localhost
-define('WP_HOME', 'http://localhost:${port}');
-define('WP_SITEURL', 'http://localhost:${port}');
+// Configuración para localhost
+define('COOKIE_DOMAIN', '');
+define('COOKIEPATH', '/');
+define('SITECOOKIEPATH', '/');
 `}
+
+// === DESACTIVAR VALIDACIONES ESTRICTAS ===
+define('RELOCATE', true);
+
+// === CONFIGURACIÓN DE SESIONES ===
+ini_set('session.cookie_httponly', 1);
+ini_set('session.use_only_cookies', 1);
+ini_set('session.cookie_lifetime', 0);
+ini_set('session.gc_maxlifetime', 3600);
 
 // === CONFIGURACIÓN DE DEBUG ===
 define('WP_DEBUG', true);
@@ -317,16 +341,17 @@ define('WP_AUTO_UPDATE_CORE', false);
 define('DISALLOW_FILE_EDIT', true);
 define('WP_POST_REVISIONS', 3);
 define('AUTOMATIC_UPDATER_DISABLED', true);
+define('WP_MEMORY_LIMIT', '256M');
 
-// === CLAVES DE SEGURIDAD ===
-define('AUTH_KEY',         'docker-dev-auth-key-' . time());
-define('SECURE_AUTH_KEY',  'docker-dev-secure-auth-key-' . time());
-define('LOGGED_IN_KEY',    'docker-dev-logged-in-key-' . time());
-define('NONCE_KEY',        'docker-dev-nonce-key-' . time());
-define('AUTH_SALT',        'docker-dev-auth-salt-' . time());
-define('SECURE_AUTH_SALT', 'docker-dev-secure-auth-salt-' . time());
-define('LOGGED_IN_SALT',   'docker-dev-logged-in-salt-' . time());
-define('NONCE_SALT',       'docker-dev-nonce-salt-' . time());
+// === CLAVES DE SEGURIDAD FIJAS ===
+define('AUTH_KEY',         'wpsite-dev-auth-key-12345');
+define('SECURE_AUTH_KEY',  'wpsite-dev-secure-auth-key-12345');
+define('LOGGED_IN_KEY',    'wpsite-dev-logged-in-key-12345');
+define('NONCE_KEY',        'wpsite-dev-nonce-key-12345');
+define('AUTH_SALT',        'wpsite-dev-auth-salt-12345');
+define('SECURE_AUTH_SALT', 'wpsite-dev-secure-auth-salt-12345');
+define('LOGGED_IN_SALT',   'wpsite-dev-logged-in-salt-12345');
+define('NONCE_SALT',       'wpsite-dev-nonce-salt-12345');
 
 \$table_prefix = '${config.database.tablePrefix || 'wp_'}';
 
@@ -345,7 +370,7 @@ require_once ABSPATH . 'wp-settings.php';
   fs.writeFileSync(wpConfigPath, wpConfig);
 }
 
-// Configurar wp-content personalizado con sincronización automática
+// Configurar wp-content personalizado con sincronización bidireccional
 async function setupCustomContent() {
   const wpContentPath = './wordpress/wp-content';
   const sourceContentPath = './wp-content';
@@ -368,8 +393,11 @@ async function setupCustomContent() {
     console.log(chalk.blue('💻 Windows detectado - copiando wp-content...'));
     fs.cpSync(sourceContentPath, wpContentPath, { recursive: true });
 
-    // Configurar watch para sincronización automática
-    setupFileWatcher(sourceContentPath, wpContentPath);
+    // Configurar watch bidireccional para sincronización automática
+    const watchers = setupFileWatcher(sourceContentPath, wpContentPath);
+
+    // Guardar watchers para cleanup posterior
+    global.wpContentWatchers = watchers;
   } else {
     // En Mac/Linux usar symlink
     console.log(chalk.blue('🔗 Creando symlink para wp-content...'));
@@ -385,62 +413,141 @@ async function setupCustomContent() {
   }
 }
 
-// Configurar watcher para sincronizar cambios automáticamente
+// Configurar watcher bidireccional con protección contra escritura simultánea
 function setupFileWatcher(sourcePath, targetPath) {
   const chokidar = require('chokidar');
-
-  console.log(chalk.blue('👀 Configurando sincronización automática de archivos...'));
-
-  const watcher = chokidar.watch(sourcePath, {
+  
+  console.log(chalk.blue('👀 Configurando sincronización bidireccional de archivos...'));
+  
+  // Debounce para evitar múltiples ejecuciones
+  const debounceTimers = new Map();
+  
+  function debounceAction(key, action, delay = 1000) {
+    if (debounceTimers.has(key)) {
+      clearTimeout(debounceTimers.get(key));
+    }
+    
+    debounceTimers.set(key, setTimeout(() => {
+      action();
+      debounceTimers.delete(key);
+    }, delay));
+  }
+  
+  // Función para verificar si un archivo está siendo escrito
+  function isFileBeingWritten(filePath) {
+    try {
+      const stats = fs.statSync(filePath);
+      return stats.size === 0; // Si está vacío, probablemente se está escribiendo
+    } catch (error) {
+      return true; // Si hay error, asumir que se está escribiendo
+    }
+  }
+  
+  // Función para copiar archivo de forma segura
+  function safeCopyFile(source, target, direction) {
+    try {
+      // Verificar que el archivo fuente no esté vacío
+      if (isFileBeingWritten(source)) {
+        console.log(chalk.yellow(`⏳ Esperando que termine de escribirse: ${path.basename(source)}`));
+        // Reintentar después de un momento
+        setTimeout(() => safeCopyFile(source, target, direction), 2000);
+        return;
+      }
+      
+      const targetDir = path.dirname(target);
+      if (!fs.existsSync(targetDir)) {
+        fs.mkdirSync(targetDir, { recursive: true });
+      }
+      
+      // Leer el contenido para verificar que no esté vacío
+      const content = fs.readFileSync(source);
+      if (content.length === 0) {
+        console.log(chalk.yellow(`⏳ Archivo vacío, esperando contenido: ${path.basename(source)}`));
+        setTimeout(() => safeCopyFile(source, target, direction), 2000);
+        return;
+      }
+      
+      fs.writeFileSync(target, content);
+      const relativePath = path.relative(direction === 'local-to-container' ? sourcePath : targetPath, source);
+      console.log(chalk.green(`🔄 ${direction === 'local-to-container' ? 'Local→Contenedor' : 'Contenedor→Local'}: ${relativePath}`));
+      
+    } catch (error) {
+      console.log(chalk.red(`❌ Error en copia segura: ${error.message}`));
+    }
+  }
+  
+  // Watcher 1: local → contenedor
+  const localWatcher = chokidar.watch(sourcePath, {
     ignored: /node_modules/,
     persistent: true,
     ignoreInitial: true
   });
 
-  watcher
+  localWatcher
     .on('change', (filePath) => {
       const relativePath = path.relative(sourcePath, filePath);
       const targetFile = path.join(targetPath, relativePath);
-
-      try {
-        fs.copyFileSync(filePath, targetFile);
-        console.log(chalk.green(`🔄 Actualizado: ${relativePath}`));
-      } catch (error) {
-        console.log(chalk.red(`❌ Error actualizando ${relativePath}: ${error.message}`));
-      }
+      
+      debounceAction(`local-${filePath}`, () => {
+        safeCopyFile(filePath, targetFile, 'local-to-container');
+      }, 1500);
     })
     .on('add', (filePath) => {
       const relativePath = path.relative(sourcePath, filePath);
       const targetFile = path.join(targetPath, relativePath);
-
-      try {
-        // Crear directorio si no existe
-        const targetDir = path.dirname(targetFile);
-        if (!fs.existsSync(targetDir)) {
-          fs.mkdirSync(targetDir, { recursive: true });
-        }
-
-        fs.copyFileSync(filePath, targetFile);
-        console.log(chalk.green(`➕ Agregado: ${relativePath}`));
-      } catch (error) {
-        console.log(chalk.red(`❌ Error agregando ${relativePath}: ${error.message}`));
-      }
-    })
-    .on('unlink', (filePath) => {
-      const relativePath = path.relative(sourcePath, filePath);
-      const targetFile = path.join(targetPath, relativePath);
-
-      try {
-        if (fs.existsSync(targetFile)) {
-          fs.unlinkSync(targetFile);
-          console.log(chalk.yellow(`🗑️ Eliminado: ${relativePath}`));
-        }
-      } catch (error) {
-        console.log(chalk.red(`❌ Error eliminando ${relativePath}: ${error.message}`));
-      }
+      
+      debounceAction(`local-add-${filePath}`, () => {
+        safeCopyFile(filePath, targetFile, 'local-to-container');
+      }, 1500);
     });
 
-  console.log(chalk.green('✅ Sincronización automática configurada'));
+  // Watcher 2: contenedor → local (con más demora para archivos JSON)
+  const containerWatcher = chokidar.watch(targetPath, {
+    ignored: [/node_modules/, /wp-content-original/, /wp-content-backup/],
+    persistent: true,
+    ignoreInitial: true
+  });
+
+  containerWatcher
+    .on('change', (filePath) => {
+      const relativePath = path.relative(targetPath, filePath);
+      const sourceFile = path.join(sourcePath, relativePath);
+      
+      // Dar más tiempo a archivos JSON porque suelen ser escritos por builders
+      const delay = filePath.endsWith('.json') ? 3000 : 1500;
+      
+      debounceAction(`container-${filePath}`, () => {
+        if (fs.existsSync(sourceFile)) {
+          try {
+            const containerStat = fs.statSync(filePath);
+            const localStat = fs.statSync(sourceFile);
+            
+            if (containerStat.mtime > localStat.mtime) {
+              safeCopyFile(filePath, sourceFile, 'container-to-local');
+            }
+          } catch (error) {
+            console.log(chalk.red(`❌ Error comparando fechas: ${error.message}`));
+          }
+        }
+      }, delay);
+    })
+    .on('add', (filePath) => {
+      const relativePath = path.relative(targetPath, filePath);
+      const sourceFile = path.join(sourcePath, relativePath);
+      
+      const delay = filePath.endsWith('.json') ? 3000 : 1500;
+      
+      debounceAction(`container-add-${filePath}`, () => {
+        if (!fs.existsSync(sourceFile)) {
+          safeCopyFile(filePath, sourceFile, 'container-to-local');
+        }
+      }, delay);
+    });
+    
+  console.log(chalk.green('✅ Sincronización bidireccional configurada'));
+  console.log(chalk.yellow('   Local ↔ Contenedor: Cambios se sincronizan con protección anti-conflictos'));
+  
+  return { localWatcher, containerWatcher };
 }
 
 // Iniciar contenedor Docker principal
@@ -606,10 +713,10 @@ async function startNgrokTunnel(port, spinner) {
       }
 
       // Iniciar túnel ngrok
-      const ngrokProcess = spawn('ngrok', ['http', port, '--host-header=rewrite'], { 
-  stdio: 'pipe',
-  detached: false 
-});
+      const ngrokProcess = spawn('ngrok', ['http', port, '--host-header=rewrite'], {
+        stdio: 'pipe',
+        detached: false
+      });
 
       let ngrokUrl = null;
       let attempts = 0;
