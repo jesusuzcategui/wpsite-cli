@@ -370,13 +370,13 @@ require_once ABSPATH . 'wp-settings.php';
   fs.writeFileSync(wpConfigPath, wpConfig);
 }
 
-// Configurar wp-content personalizado con sincronización bidireccional
+// Configurar wp-content personalizado
 async function setupCustomContent() {
   const wpContentPath = './wordpress/wp-content';
   const sourceContentPath = './wp-content';
-
+  
   console.log(chalk.blue('🔗 Configurando wp-content personalizado...'));
-
+  
   // Hacer backup del wp-content original si existe
   if (fs.existsSync(wpContentPath)) {
     const backupPath = './wordpress/wp-content-original';
@@ -387,24 +387,17 @@ async function setupCustomContent() {
       fs.rmSync(wpContentPath, { recursive: true, force: true });
     }
   }
-
-  // En Windows con Docker, copiar inicialmente
-  if (process.platform === 'win32') {
-    console.log(chalk.blue('💻 Windows detectado - copiando wp-content...'));
-    fs.cpSync(sourceContentPath, wpContentPath, { recursive: true });
-
-    // Configurar watch bidireccional para sincronización automática
-    const watchers = setupFileWatcher(sourceContentPath, wpContentPath);
-
-    // Guardar watchers para cleanup posterior
-    global.wpContentWatchers = watchers;
-  } else {
-    // En Mac/Linux usar symlink
-    console.log(chalk.blue('🔗 Creando symlink para wp-content...'));
-    const absoluteWpContent = path.resolve(sourceContentPath);
-    fs.symlinkSync(absoluteWpContent, wpContentPath);
-  }
-
+  
+  // Usar copia en lugar de symlink para mejor compatibilidad con Docker
+  console.log(chalk.blue('📁 Copiando wp-content...'));
+  fs.cpSync(sourceContentPath, wpContentPath, { recursive: true });
+  
+  // Configurar watch bidireccional para sincronización automática
+  const watchers = setupFileWatcher(sourceContentPath, wpContentPath);
+  
+  // Guardar watchers para cleanup posterior
+  global.wpContentWatchers = watchers;
+  
   // Verificar que se configuró correctamente
   if (fs.existsSync(wpContentPath + '/themes')) {
     console.log(chalk.green('✅ wp-content configurado correctamente'));
