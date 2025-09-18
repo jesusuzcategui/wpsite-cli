@@ -1,0 +1,67 @@
+{
+  "name": "wpsite-cli",
+  "version": "1.2.0",
+  "description": "WordPress development CLI tool powered by Docker with intelligent file synchronization",
+  "bin": {
+    "wpsite": "./bin/wpsite.js"
+  },
+  "main": "bin/wpsite.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build": "echo \"No build process needed\"",
+    "prepublishOnly": "echo \"Preparing for publish...\"",
+    "postinstall": "node -e \"const fs=require('fs'); const path='./bin/wpsite.js'; const content=fs.readFileSync(path,'utf8').replace(/\\r\\n/g,'\\n').replace(/\\r/g,'\\n'); fs.writeFileSync(path,content); fs.chmodSync(path,0o755);\""
+  },
+  "dependencies": {
+    "commander": "^11.0.0",
+    "chalk": "^4.1.2",
+    "ora": "^5.4.1",
+    "adm-zip": "^0.5.10",
+    "chokidar": "^3.5.3"
+  },
+  "engines": {
+    "node": ">=14.0.0"
+  },
+  "keywords": [
+    "wordpress",
+    "cli",
+    "development",
+    "docker",
+    "ngrok",
+    "sync",
+    "wp-content",
+    "tunnel",
+    "local-development"
+  ],
+  "author": {
+    "name": "Your Name",
+    "email": "your.email@example.com",
+    "url": "https://github.com/your-username"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/your-username/wpsite-cli.git"
+  },
+  "bugs": {
+    "url": "https://github.com/your-username/wpsite-cli/issues"
+  },
+  "homepage": "https://github.com/your-username/wpsite-cli#readme",
+  "files": [
+    "bin/",
+    "src/",
+    "Dockerfile",
+    "README.md",
+    "LICENSE"
+  ],
+  "preferGlobal": true,
+  "os": [
+    "darwin",
+    "linux",
+    "win32"
+  ],
+  "cpu": [
+    "x64",
+    "arm64"
+  ]
+}
