@@ -1,6 +1,6 @@
 {
   "name": "wpsite-cli",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "description": "WordPress development CLI tool powered by Docker with intelligent file synchronization",
   "bin": {
     "wpsite": "./bin/wpsite.js"
