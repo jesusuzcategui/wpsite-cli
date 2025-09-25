@@ -33,14 +33,14 @@ const doctorCommand = require('../src/commands/doctor');
 
 // Banner
 console.log(chalk.blue('╔══════════════════════════════════════════════╗'));
-console.log(chalk.blue('║              WPSite CLI v1.0.0               ║'));
+console.log(chalk.blue('║              WPSite CLI v1.3.0               ║'));
 console.log(chalk.blue('║         WordPress Development Tool           ║'));
 console.log(chalk.blue('╚══════════════════════════════════════════════╝'));
 
 program
   .name('wpsite')
   .description('WordPress development CLI tool powered by Docker')
-  .version('1.0.0');
+  .version('1.3.0');
 
 // Comando dev con opciones mejoradas
 program

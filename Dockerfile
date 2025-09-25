@@ -3,7 +3,7 @@ FROM wordpress:6.4-php8.2-apache
 # Metadatos
 LABEL maintainer="wpsite-cli"
 LABEL description="WordPress development container with Git support"
-LABEL version="1.0.0"
+LABEL version="1.3.0"
 
 # Actualizar repositorios e instalar herramientas de desarrollo
 RUN apt-get update && \
